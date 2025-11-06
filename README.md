@@ -1,6 +1,6 @@
 # Datamonkey TUI Client
 
-A modern terminal user interface (TUI) for interacting with the Datamonkey phylogenetic analysis service.
+A modern terminal user interface (TUI) for interacting with the Datamonkey phylogenetic analysis service. Useful for fast and lightweight testing, fun, shiggles.
 
 ## Features
 
