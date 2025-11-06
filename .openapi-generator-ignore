@@ -1,0 +1,19 @@
+# OpenAPI Generator Ignore
+# Preserve custom wrapper code
+src/datamonkey_tui/api/*.py
+
+# Preserve config
+.env
+.env.example
+
+# Preserve documentation
+README.md
+IMPLEMENTATION_PLAN.md
+CODEGEN_STRATEGY.md
+VEGA_EDITOR_INTEGRATION.md
+
+# Preserve project files
+Makefile
+pyproject.toml
+requirements.txt
+setup.py

@@ -1,0 +1,5892 @@
+openapi: 3.0.2
+info:
+  version: 1.2.0
+  title: Datamonkey API
+  contact:
+    email: spond@temple.edu
+    url: 'http://github.com/veg/api-datamonkey'
+  x-logo:
+    url: >-
+      https://raw.githubusercontent.com/veg/datamonkey-js/refs/heads/master/public/assets/img/header-logo.svg
+    altText: Datamonkey.org logo
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+  description: >
+    Datamonkey is a free public server for comparative analysis of sequence
+    alignments using state-of-the-art statistical models. <br> This is the
+    OpenAPI definition for the Datamonkey API.
+externalDocs:
+  description: Use Datamonkey today!
+  url: 'https://datamonkey.org'
+tags:
+  - name: Health
+    description: Check health of Datamonkey server
+  - name: Chat
+    description: Chat with an AI assistant to analyze data and run HyPhy methods
+  - name: File Upload and QC
+    description: Examples uploading files to Datamonkey
+  - name: Jobs
+    description: Manage analysis jobs
+  - name: Visualizations
+    description: Manage data visualizations (Vega-Lite specs)
+  - name: Methods
+    description: List and manage available HyPhy methods
+  - name: FEL
+    description: Examples starting jobs and fetching results for FEL
+  - name: BUSTED
+    description: Examples starting jobs and fetching results for BUSTED
+  - name: ABSREL
+    description: Examples starting jobs and fetching results for ABSREL
+  - name: BGM
+    description: >-
+      Examples starting jobs and fetching results for BGM (Bayesian Graphical
+      Model)
+  - name: CONTRAST-FEL
+    description: >-
+      Examples starting jobs and fetching results for CONTRAST-FEL (Fixed
+      Effects Likelihood with Contrast)
+  - name: FUBAR
+    description: >-
+      Examples starting jobs and fetching results for FUBAR (Fast Unconstrained
+      Bayesian AppRoximation)
+  - name: GARD
+    description: >-
+      Examples starting jobs and fetching results for GARD (Genetic Algorithm
+      for Recombination Detection)
+  - name: MEME
+    description: >-
+      Examples starting jobs and fetching results for MEME (Mixed Effects Model
+      of Evolution)
+  - name: MULTI-HIT
+    description: >-
+      Examples starting jobs and fetching results for MULTI-HIT (Multiple Hit)
+      analysis
+  - name: RELAX
+    description: >-
+      Examples starting jobs and fetching results for RELAX (Hypothesis testing
+      framework to detect relaxation of selection)
+  - name: SLAC
+    description: >-
+      Examples starting jobs and fetching results for SLAC (Single Likelihood
+      Ancestor Counting) analysis
+  - name: NRM
+    description: >-
+      Examples starting jobs and fetching results for NRM (Nucleotide
+      Non-Reversible Model) analysis
+  - name: FADE
+    description: >-
+      Examples starting jobs and fetching results for FADE (FUBAR Approach to
+      Directional Evolution) analysis
+  - name: SLATKIN
+    description: >-
+      Examples starting jobs and fetching results for SLATKIN (Slatkin-Maddison)
+      analysis
+  - name: Codon Aware Alignments
+    description: >-
+      Examples building codon-aware alignments from uploaded data. Somewhere
+      over the rainbow..
+  - name: Tree Building
+    description: >-
+      Examples building phylogenetic trees from uploaded data. Somewhere over
+      the rainbow..
+servers:
+  - url: 'http://datamonkey.org/api/v1'
+  - url: 'https://datamonkey.org/api/v1'
+parameters:
+  - name: method
+    in: path
+    description: The name of the HyPhy method
+    required: true
+    schema:
+      type: string
+paths:
+  /health:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Health
+      summary: Check health of Datamonkey
+      operationId: getHealth
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '500':
+          description: Unable to get health. Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Unable to get health. Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /chat:
+    get:
+      summary: List conversations for the authenticated user
+      operationId: listUserConversations
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of user's conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatConversation'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    post:
+      summary: Create a new conversation
+      operationId: createConversation
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: false
+          description: >-
+            Token identifying the user. If not provided, a new session will be
+            created automatically.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Optional title for the conversation
+      responses:
+        '201':
+          description: >-
+            Conversation created successfully. If no token was provided, a new
+            session token is returned in the X-Session-Token response header.
+          headers:
+            X-Session-Token:
+              $ref: '#/components/headers/XSessionToken'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversation'
+        '500':
+          description: Internal Server Error - Failed to create session or conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  '/chat/{conversationId}':
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        description: ID of the conversation
+        schema:
+          type: string
+    get:
+      summary: Get a conversation by ID
+      operationId: getConversation
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversation'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+    delete:
+      summary: Delete a conversation
+      operationId: deleteConversation
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Conversation deleted
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+  '/chat/{conversationId}/messages':
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        description: ID of the conversation
+        schema:
+          type: string
+    get:
+      summary: Get messages from a conversation
+      operationId: getConversationMessages
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of conversation messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatMessage'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+    post:
+      summary: Send a message to the conversation
+      operationId: sendConversationMessage
+      tags:
+        - Chat
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  description: Message content to send
+      responses:
+        '200':
+          description: AI response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    $ref: '#/components/schemas/ChatMessage'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+  /jobs:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Jobs
+      summary: Get a list of jobs for the authenticated user
+      description: >-
+        Returns jobs owned by the authenticated user, with optional filtering by
+        alignment ID, tree ID, method, and/or status
+      operationId: getJobsList
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+        - name: alignment_id
+          in: query
+          description: Filter jobs by alignment dataset ID
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: tree_id
+          in: query
+          description: Filter jobs by tree dataset ID
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: method
+          in: query
+          description: Filter jobs by HyPhy method
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter jobs by status
+          schema:
+            type: string
+            enum:
+              - queued
+              - running
+              - completed
+              - error
+      responses:
+        '200':
+          description: Success - returns user's jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  '/jobs/{jobId}':
+    parameters:
+      - name: jobId
+        in: path
+        description: ID of the job
+        required: true
+        schema:
+          $ref: '#/components/schemas/Hash'
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Jobs
+      summary: Get details for a specific job
+      description: Get detailed information about a specific job
+      operationId: getJobById
+      parameters:
+        - name: user_token
+          in: header
+          required: false
+          description: Token identifying the user (required if job is private)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token for private job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    delete:
+      tags:
+        - Jobs
+      summary: Delete a job
+      description: >-
+        Delete a job from the Datamonkey server. If the job is running, it will
+        be cancelled.
+      operationId: deleteJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user who owns the job
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Job deleted successfully
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /datasets:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - File Upload and QC
+      summary: Get a list of datasets for the authenticated user
+      description: Returns datasets owned by the authenticated user
+      operationId: getDatasetsList
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success - returns user's datasets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datasets'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+    post:
+      tags:
+        - File Upload and QC
+      summary: Upload a dataset to Datamonkey
+      operationId: PostDataset
+      parameters:
+        - name: user_token
+          in: header
+          required: false
+          description: >-
+            Token identifying the user. If not provided, a new session will be
+            created automatically.
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+        required: true
+      responses:
+        '201':
+          description: >-
+            Dataset uploaded successfully. If no token was provided, a new
+            session token is returned in the X-Session-Token response header.
+          headers:
+            X-Session-Token:
+              $ref: '#/components/headers/XSessionToken'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datasets'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  '/datasets/{datasetId}':
+    parameters:
+      - name: datasetId
+        in: path
+        description: ID of the dataset to retrieve
+        required: true
+        schema:
+          $ref: '#/components/schemas/Hash'
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - File Upload and QC
+      summary: Get details for a specific dataset
+      description: >
+        Get detailed information about a specific dataset.
+
+        By default, returns metadata only (id, name, type, description,
+        timestamps).
+
+        Use `include_content=true` query parameter to include the actual
+        sequence data.
+      operationId: getDatasetById
+      parameters:
+        - name: user_token
+          in: header
+          required: false
+          description: Token identifying the user (required if dataset is private)
+          schema:
+            type: string
+        - name: include_content
+          in: query
+          required: false
+          description: >
+            If true, includes the dataset content (sequence data) in the
+            response.
+
+            Default is false (metadata only) for better performance.
+          schema:
+            type: boolean
+            default: false
+          example: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '401':
+          description: Unauthorized - Invalid or missing user token for private dataset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
+          description: Dataset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    delete:
+      tags:
+        - File Upload and QC
+      summary: Delete a dataset
+      description: Delete a dataset from the Datamonkey server
+      operationId: deleteDataset
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user who owns the dataset
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Dataset deleted successfully
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this dataset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Dataset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /visualizations:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Visualizations
+      summary: Get a list of visualizations for the authenticated user
+      description: >-
+        Returns visualizations owned by the authenticated user. Can be filtered
+        by job ID or dataset ID.
+      operationId: getVisualizationsList
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+        - name: job_id
+          in: query
+          required: false
+          description: Filter visualizations by job ID
+          schema:
+            type: string
+        - name: dataset_id
+          in: query
+          required: false
+          description: Filter visualizations by dataset ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success - returns user's visualizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visualizations'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - Visualizations
+      summary: Create a new visualization
+      description: Create and store a new Vega-Lite visualization specification
+      operationId: createVisualization
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVisualizationRequest'
+        required: true
+      responses:
+        '201':
+          description: Visualization created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visualization'
+        '400':
+          description: Bad Request - Invalid visualization data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  '/visualizations/{vizId}':
+    parameters:
+      - name: vizId
+        in: path
+        description: ID of the visualization to retrieve
+        required: true
+        schema:
+          $ref: '#/components/schemas/Hash'
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Visualizations
+      summary: Get details for a specific visualization
+      description: Retrieve a specific visualization by its ID
+      operationId: getVisualization
+      parameters:
+        - name: user_token
+          in: header
+          required: false
+          description: >-
+            Token identifying the user. Required for private visualizations,
+            optional for public ones.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visualization'
+        '401':
+          description: >-
+            Unauthorized - Invalid or missing user token for private
+            visualization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
+          description: Visualization not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    put:
+      tags:
+        - Visualizations
+      summary: Update a visualization
+      description: Update an existing visualization's metadata or spec
+      operationId: updateVisualization
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user who owns the visualization
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVisualizationRequest'
+        required: true
+      responses:
+        '200':
+          description: Visualization updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Visualization'
+        '400':
+          description: Bad Request - Invalid update data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this visualization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Visualization not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    delete:
+      tags:
+        - Visualizations
+      summary: Delete a visualization
+      description: Delete a visualization from the Datamonkey server
+      operationId: deleteVisualization
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user who owns the visualization
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Visualization deleted successfully
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not own this visualization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Visualization not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - Methods
+      summary: Get a list of available HyPhy methods
+      description: >-
+        Returns a list of all available HyPhy methods that can be run on the
+        server
+      operationId: getMethodsList
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MethodsList'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fel-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - FEL
+      summary: Start and monitor a FEL job
+      operationId: startFELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FelRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity - Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fel-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - FEL
+      summary: Get a FEL job result by job ID
+      operationId: getFELJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - FEL
+      summary: Get a FEL job result
+      operationId: getFELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FelRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/busted-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - BUSTED
+      summary: Start and monitor a BUSTED job
+      operationId: startBUSTEDJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BustedRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/busted-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - BUSTED
+      summary: Get a BUSTED job result by job ID
+      operationId: getBUSTEDJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BustedResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - BUSTED
+      summary: Get a BUSTED job result
+      operationId: getBUSTEDJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BustedRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BustedResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/absrel-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - ABSREL
+      summary: Start and monitor an ABSREL job
+      operationId: startABSRELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbsrelRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/absrel-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - ABSREL
+      summary: Get an ABSREL job result by job ID
+      operationId: getABSRELJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsrelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - ABSREL
+      summary: Get an ABSREL job result
+      operationId: getABSRELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbsrelRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsrelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/meme-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - MEME
+      summary: Start a MEME analysis
+      operationId: startMEMEJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemeRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/meme-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - MEME
+      summary: Get a MEME job result by job ID
+      operationId: getMEMEJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemeResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - MEME
+      summary: Get MEME analysis results
+      operationId: getMEMEJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemeRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemeResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/relax-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - RELAX
+      summary: Start and monitor a RELAX job
+      operationId: startRELAXJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelaxRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/relax-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - RELAX
+      summary: Get a RELAX job result by job ID
+      operationId: getRELAXJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelaxResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - RELAX
+      summary: Get RELAX analysis results
+      operationId: getRELAXJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelaxRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelaxResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/gard-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - GARD
+      summary: Start a GARD analysis
+      operationId: startGARDJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GardRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/gard-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - GARD
+      summary: Get a GARD job result by job ID
+      operationId: getGARDJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GardResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - GARD
+      summary: Get GARD analysis results
+      operationId: getGARDJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GardRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GardResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/bgm-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - BGM
+      summary: Start and monitor a BGM job
+      operationId: startBGMJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BgmRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/bgm-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - BGM
+      summary: Get a BGM job result by job ID
+      operationId: getBGMJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BgmResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - BGM
+      summary: Get a BGM job result
+      operationId: getBGMJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BgmRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BgmResult'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/contrast-fel-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - CONTRAST-FEL
+      summary: Start a CONTRAST-FEL analysis
+      description: >
+        Starts a Contrast-FEL (Fixed Effects Likelihood with Contrast) job to
+        investigate whether selective pressures differ 
+
+        between two or more sets of branches at a site. The method estimates
+        site-specific synonymous (alpha) and 
+
+        non-synonymous (beta, one per branch set) substitution rates and tests
+        beta rates for equality at each site.
+      operationId: startCONTRASTFELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContrastFelRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/contrast-fel-result:
+    get:
+      tags:
+        - CONTRAST-FEL
+      summary: Get CONTRAST-FEL job result by job ID
+      operationId: getContrastFELJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContrastFelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - CONTRAST-FEL
+      summary: Get CONTRAST-FEL analysis results
+      description: >
+        Retrieves the results of a previously submitted CONTRAST-FEL job.
+        CONTRAST-FEL investigates whether 
+
+        selective pressures differ between two or more sets of branches at a
+        site by estimating site-specific 
+
+        synonymous and non-synonymous substitution rates.
+      operationId: getCONTRASTFELJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContrastFelRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContrastFelResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fubar-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - FUBAR
+      summary: Start a FUBAR analysis
+      description: >
+        Starts a Fast Unconstrained Bayesian AppRoximation (FUBAR) job to detect
+        sites under positive selection.
+
+        FUBAR uses a Bayesian approach to infer selection pressures at
+        individual sites, providing posterior
+
+        probabilities of positive and negative selection.
+      operationId: startFUBARJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FubarRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fubar-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - FUBAR
+      summary: Get a FUBAR job result by job ID
+      operationId: getFUBARJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FubarResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - FUBAR
+      summary: Get FUBAR analysis results
+      description: >
+        Retrieves the results of a previously submitted Fast Unconstrained
+        Bayesian AppRoximation (FUBAR) job.
+
+        FUBAR uses a Bayesian approach to infer selection pressures at
+        individual sites, providing posterior
+
+        probabilities of positive and negative selection.
+      operationId: getFUBARJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FubarRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FubarResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/multihit-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - MULTI-HIT
+      summary: Start a MULTI-HIT analysis
+      description: >
+        MULTI-HIT (Multiple Hit) examines whether or not a codon alignment is
+        better fit by models 
+
+        which permit multiple instantaneous substitutions. It can analyze both
+        double-hit and 
+
+        triple-hit substitutions, with an option to account for synonymous
+        triple-hit substitutions.
+      operationId: startMULTIHITJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultihitRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/multihit-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - MULTI-HIT
+      summary: Get a MULTI-HIT job result by job ID
+      operationId: getMULTIHITJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultihitResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - MULTI-HIT
+      summary: Get MULTI-HIT analysis results
+      description: >
+        Retrieve the results of a previously submitted MULTI-HIT analysis job.
+
+        Results include evidence ratios for different substitution types,
+        site-specific substitutions,
+
+        model fitting information, and statistical test results comparing
+        different models.
+      operationId: getMULTIHITJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultihitRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultihitResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/slac-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - SLAC
+      summary: Start a SLAC analysis
+      description: >
+        SLAC (Single Likelihood Ancestor Counting) uses a maximum likelihood
+        ancestral state reconstruction
+
+        and minimum path substitution counting to estimate site-level dS and dN,
+        and applies a simple
+
+        binomial-based test to test if dS differs from dN. The estimates
+        aggregate information over all branches,
+
+        so the signal is derived from pervasive diversification or conservation.
+      operationId: startSLACJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlacRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/slac-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - SLAC
+      summary: Get a SLAC job result by job ID
+      operationId: getSLACJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlacResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - SLAC
+      summary: Get SLAC analysis results
+      description: >
+        Retrieve the results of a previously submitted SLAC (Single Likelihood
+        Ancestor Counting) analysis job.
+
+        Results include model fitting information, branch attributes, and
+        site-specific dN/dS estimates.
+      operationId: getSLACJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlacRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlacResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/nrm-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - NRM
+      summary: Start and monitor an NRM (Nucleotide Non-Reversible Model) job
+      operationId: startNRMJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NrmRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/nrm-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - NRM
+      summary: Get an NRM job result by job ID
+      operationId: getNRMJobById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NrmResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - NRM
+      summary: Get an NRM job result
+      operationId: getNRMJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NrmRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NrmResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fade-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - FADE
+      summary: Start a FADE job
+      description: >
+        Start a FADE (FUBAR Approach to Directional Evolution) job. FADE is a
+        fast method to test  whether or not a subset of sites in a protein
+        alignment evolve towards a particular residue  along a subset of
+        branches at accelerated rates compared to reference model. FADE uses a 
+        random effects model and latent Dirichlet allocation (LDA) - inspired
+        approximation methods  to allocate sites to rate classes.
+      operationId: startFadeJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FadeRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/fade-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - FADE
+      summary: Get a FADE job result by job ID
+      operationId: getFadeResultsById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FadeResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - FADE
+      summary: Get a FADE job result
+      operationId: getFadeResults
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FadeRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FadeResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/slatkin-start:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    post:
+      tags:
+        - SLATKIN
+      summary: Start a Slatkin-Maddison analysis
+      operationId: startSlatkinJob
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: >-
+            Token identifying the user. Required to reference datasets owned by
+            the user.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlatkinRequest'
+      responses:
+        '200':
+          description: Job started successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '401':
+          description: Unauthorized - Invalid or missing user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have access to the specified dataset(s)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Not Found - Specified dataset(s) not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '422':
+          description: Unprocessable Entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidDataError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+  /methods/slatkin-result:
+    parameters:
+      - name: pretty_print
+        in: query
+        description: Pretty print response
+        schema:
+          type: boolean
+    get:
+      tags:
+        - SLATKIN
+      summary: Get a Slatkin-Maddison job result by job ID
+      operationId: getSlatkinResultsById
+      parameters:
+        - name: job_id
+          in: query
+          description: Job ID to fetch results for
+          required: true
+          schema:
+            $ref: '#/components/schemas/Hash'
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlatkinResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+    post:
+      tags:
+        - SLATKIN
+      summary: Get a Slatkin-Maddison job result
+      operationId: getSlatkinResults
+      parameters:
+        - name: user_token
+          in: header
+          required: true
+          description: Token identifying the user
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlatkinRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlatkinResult'
+        '401':
+          description: Unauthorized - Invalid user token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '403':
+          description: Forbidden - User does not have permission to access this job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForbiddenError'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+components:
+  schemas:
+    Status:
+      type: string
+      enum:
+        - healthy
+        - unhealthy
+        - unknown
+    Health:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/Status'
+        details:
+          type: object
+          optional: true
+          properties:
+            job_scheduler:
+              $ref: '#/components/schemas/Status'
+              description: 'Health status of the job scheduler (e.g., SLURM, PBS, etc.)'
+            datamonkey:
+              $ref: '#/components/schemas/Status'
+              description: Health status of the Datamonkey API service
+            llm:
+              $ref: '#/components/schemas/Status'
+              description: Health status of the Language Learning Model service
+            database:
+              $ref: '#/components/schemas/Status'
+              description: Health status of the database
+    ChatMessage:
+      type: object
+      description: A message in a chat session
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          description: Role of the message sender
+          enum:
+            - user
+            - assistant
+        content:
+          type: string
+          description: Content of the message
+        timestamp:
+          type: integer
+          format: int64
+          description: Timestamp when the message was sent (Unix timestamp in milliseconds)
+    ChatConversation:
+      type: object
+      description: A conversation between a user and the AI assistant
+      required:
+        - id
+        - created
+        - updated
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the conversation
+        title:
+          type: string
+          description: Optional title for the conversation
+        created:
+          type: integer
+          format: int64
+          description: >-
+            Timestamp when the conversation was created (Unix timestamp in
+            milliseconds)
+        updated:
+          type: integer
+          format: int64
+          description: >-
+            Timestamp when the conversation was last updated (Unix timestamp in
+            milliseconds)
+        messages:
+          type: array
+          description: List of messages in the conversation
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+    UnauthorizedError:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 401
+        message:
+          type: string
+          example: 'Unauthorized: Invalid or missing user token'
+      required:
+        - code
+        - message
+    ServerError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A general description of the error.
+        code:
+          type: string
+          description: A unique error code (if available).
+        details:
+          type: string
+          description: Optional details about the error.
+    ForbiddenError:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 403
+        message:
+          type: string
+          example: 'Forbidden: User does not have permission to access this resource'
+      required:
+        - code
+        - message
+    Hash:
+      type: string
+      pattern: '^[a-zA-Z0-9]+$'
+    NotFoundError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Job not found
+        status:
+          type: integer
+          description: HTTP status code
+          example: 404
+        job_id:
+          allOf:
+            - $ref: '#/components/schemas/Hash'
+            - description: The job ID that was not found
+      required:
+        - error
+        - status
+    JobStatus:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        alignment_id:
+          $ref: '#/components/schemas/Hash'
+          description: ID of the alignment dataset associated with this job
+        tree_id:
+          $ref: '#/components/schemas/Hash'
+          description: ID of the tree dataset associated with this job
+        status:
+          type: string
+          enum:
+            - queued
+            - running
+            - completed
+            - error
+        error_message:
+          type: string
+        method:
+          type: string
+          description: The HyPhy method used for this job
+    DatasetMeta:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+    Dataset:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/DatasetMeta'
+        - type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/Hash'
+            user_token:
+              type: string
+              description: Token identifying the user who owns this dataset
+            created:
+              type: string
+              format: date-time
+            updated:
+              type: string
+              format: date-time
+            content:
+              type: string
+              description: >
+                The actual dataset content (sequence data).
+
+                Only included when `include_content=true` query parameter is
+                used.
+
+                For FASTA files, this will be the raw FASTA format text.
+              example: |-
+                >seq1
+                ATGCATGCATGCATGC
+                >seq2
+                ATGCATGCATGCATGT
+    Datasets:
+      type: object
+      properties:
+        datasets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dataset'
+    UploadRequest:
+      type: object
+      properties:
+        meta:
+          $ref: '#/components/schemas/DatasetMeta'
+        user_token:
+          type: string
+          description: Token identifying the user who is uploading the dataset
+        file:
+          type: string
+          format: binary
+          description: Dataset File. incompatible with the url field
+        url:
+          type: string
+          description: URL of the file to upload. incompatible with the file field
+    InvalidDataError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: The field that caused the error
+              message:
+                type: string
+                description: The error message
+    Visualization:
+      type: object
+      properties:
+        viz_id:
+          type: string
+          description: Unique identifier for the visualization
+          example: viz_1730764800_123
+        job_id:
+          type: string
+          description: Job ID associated with this visualization
+          example: 550e8400-e29b-41d4-a716-446655440000
+        dataset_id:
+          type: string
+          description: Dataset ID associated with this visualization (optional)
+          example: 550e8400-e29b-41d4-a716-446655440001
+        title:
+          type: string
+          description: Title of the visualization
+          example: Selection Pressure Across Sites
+        description:
+          type: string
+          description: Description of what the visualization shows
+          example: Bar chart showing dN/dS ratios for each codon position
+        spec:
+          type: object
+          description: The Vega-Lite visualization specification
+          additionalProperties: true
+        config:
+          type: object
+          description: Additional configuration options
+          additionalProperties: true
+        metadata:
+          type: object
+          description: Additional metadata about the visualization
+          properties:
+            library:
+              type: string
+              description: Visualization library used
+              example: vega-lite
+            generated_by:
+              type: string
+              description: Tool or method that generated this visualization
+              example: makeVegaSpec
+            prompt:
+              type: string
+              description: Original prompt used to generate the visualization
+              example: Create a bar chart showing selection pressure
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the visualization was created
+          example: '2024-11-04T19:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp when the visualization was last updated
+          example: '2024-11-04T19:30:00Z'
+      required:
+        - viz_id
+        - job_id
+        - title
+        - spec
+    Visualizations:
+      type: object
+      properties:
+        visualizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Visualization'
+    CreateVisualizationRequest:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: Job ID to associate with this visualization
+          example: 550e8400-e29b-41d4-a716-446655440000
+        dataset_id:
+          type: string
+          description: Dataset ID to associate with this visualization (optional)
+          example: 550e8400-e29b-41d4-a716-446655440001
+        title:
+          type: string
+          description: Title of the visualization
+          example: Selection Pressure Across Sites
+        description:
+          type: string
+          description: Description of what the visualization shows
+          example: Bar chart showing dN/dS ratios for each codon position
+        spec:
+          type: object
+          description: The Vega-Lite visualization specification
+          additionalProperties: true
+        config:
+          type: object
+          description: Additional configuration options
+          additionalProperties: true
+        metadata:
+          type: object
+          description: Additional metadata about the visualization
+          additionalProperties: true
+      required:
+        - job_id
+        - title
+        - spec
+    UpdateVisualizationRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Updated title of the visualization
+          example: Updated Selection Pressure Chart
+        description:
+          type: string
+          description: Updated description
+          example: Updated bar chart showing dN/dS ratios
+        spec:
+          type: object
+          description: Updated Vega-Lite visualization specification
+          additionalProperties: true
+        config:
+          type: object
+          description: Updated configuration options
+          additionalProperties: true
+        metadata:
+          type: object
+          description: Updated metadata
+          additionalProperties: true
+    MethodsList:
+      type: object
+      properties:
+        methods:
+          type: array
+          description: List of available HyPhy methods
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: 'Method identifier (e.g., "fel", "busted", "absrel")'
+              name:
+                type: string
+                description: Human-readable name of the method
+              description:
+                type: string
+                description: Brief description of what the method does
+              status:
+                type: string
+                description: Current status of the method
+                enum:
+                  - available
+                  - beta
+                  - deprecated
+                default: available
+              start_endpoint:
+                type: string
+                description: API endpoint to start a job for this method
+              result_endpoint:
+                type: string
+                description: API endpoint to retrieve results for this method
+              parameters:
+                type: array
+                description: List of parameters expected by this method
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: Parameter name
+                    description:
+                      type: string
+                      description: Description of the parameter
+                    required:
+                      type: boolean
+                      description: Whether the parameter is required
+                    type:
+                      type: string
+                      description: Data type of the parameter
+                    default:
+                      type: string
+                      description: Default value of the parameter (if any)
+    GeneticCode:
+      type: string
+      description: |
+        Available Genetic Codes
+      default: Universal
+      enum:
+        - Universal
+        - Vertebrate mtDNA
+        - Yeast mtDNA
+        - Mold/Protozoan mtDNA
+        - Invertebrate mtDNA
+        - Ciliate Nuclear
+        - Echinoderm mtDNA
+        - Eupltoid Nuclear
+        - Alt. Yeast Nuclear
+        - Ascidian mtDNA
+        - Flatworm mtDNA
+        - Blepharisma Nuclear
+    FelRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        ci:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'No'
+          description: Compute confidence intervals for estimated rates
+        srv:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'Yes'
+          description: Include synonymous rate variation in the model
+        resample:
+          type: number
+          default: 0
+          description: Number of bootstrap resamples
+        multiple_hits:
+          type: string
+          enum:
+            - None
+            - Double
+            - Double+Triple
+          default: None
+          description: Specify handling of multiple nucleotide substitutions
+        site_multihit:
+          type: string
+          enum:
+            - Estimate
+            - Global
+          default: Estimate
+          description: Specify whether to estimate multiple hit rates for each site
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        branches:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Branches to include in the analysis. If empty, all branches are
+            included.
+    Email:
+      description: User email address
+      type: string
+      format: test
+      example: john.smith@example.com
+    AnalysisInfo:
+      type: object
+      properties:
+        authors: string
+        citation: string
+        contact:
+          $ref: '#/components/schemas/Email'
+        info: string
+        requirements: string
+        settings:
+          type: object
+          properties:
+            ci: number
+            multihit: string
+            pvalue: number
+            resample: number
+            site_filter:
+              type: object
+              properties:
+                site_filter: string
+                site_save_filter: string
+            srv: number
+        version: string
+    InputInfo:
+      type: object
+      properties:
+        file_name: string
+        number_of_sequences: integer
+        number_of_sites: integer
+        partition_count: integer
+        trees:
+          type: object
+          additionalProperties:
+            type: string
+    TestedBranchesInfo:
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: string
+          enum:
+            - tested
+            - background
+    TimersInfo:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          order:
+            type: integer
+          timer:
+            type: integer
+    PartitionsInfo:
+      type: object
+      additionalProperties:
+        type: object
+        properties:
+          name:
+            type: string
+          coverage:
+            type: array
+            items:
+              type: array
+              items:
+                type: integer
+    BaseResponse:
+      type: object
+      properties:
+        analysis:
+          $ref: '#/components/schemas/AnalysisInfo'
+        input:
+          $ref: '#/components/schemas/InputInfo'
+        tested:
+          $ref: '#/components/schemas/TestedBranchesInfo'
+        timers:
+          $ref: '#/components/schemas/TimersInfo'
+        runtime:
+          type: string
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+        data partitions:
+          $ref: '#/components/schemas/PartitionsInfo'
+    FelResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      AIC-c:
+                        type: number
+                      Equilibrium frequencies:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                      Log Likelihood:
+                        type: number
+                      Rate Distributions:
+                        type: object
+                      display order:
+                        type: number
+                      estimated parameters:
+                        type: number
+                branch attributes:
+                  type: object
+                  properties:
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          Global MG94xREV:
+                            type: number
+                          Nucleotide GTR:
+                            type: number
+                          original name:
+                            type: string
+                    attributes:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          attribute type:
+                            type: string
+                          display order:
+                            type: integer
+                MLE:
+                  type: object
+                  properties:
+                    headers:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+    BustedRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        srv:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+            - branch-site
+          default: 'Yes'
+          description: Include synonymous rate variation in the model
+        multiple_hits:
+          type: string
+          enum:
+            - None
+            - Double
+            - Double+Triple
+          default: None
+          description: Specify handling of multiple nucleotide substitutions
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        branches:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Branches to include in the analysis. If empty, all branches are
+            included.
+        rates:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+          description: The number omega rate classes to include in the model
+        syn_rates:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+          description: The number synonymous rate classes to include in the model
+        grid_size:
+          type: integer
+          minimum: 1
+          default: 250
+          description: >-
+            The number of points in the initial distributional guess for
+            likelihood fitting
+        starting_points:
+          type: integer
+          minimum: 1
+          default: 1
+          description: >-
+            The number of initial random guesses to seed rate values
+            optimization
+        error_sink:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'No'
+          description: >-
+            An advanced experimental setting; include a rate class to capture
+            misalignment artifacts
+    BustedResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                background:
+                  type: number
+                fits:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      AIC-c:
+                        type: number
+                      Log Likelihood:
+                        type: number
+                      Rate Distributions:
+                        type: object
+                      display order:
+                        type: number
+                      estimated parameters:
+                        type: number
+                branch attributes:
+                  type: object
+                  properties:
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          MG94xREV with separate rates for branch sets:
+                            type: number
+                          Nucleotide GTR:
+                            type: number
+                          Posterior prob omega class:
+                            type: array
+                            items:
+                              type: array
+                              items:
+                                type: number
+                          Posterior prob omega class by site:
+                            type: array
+                            items:
+                              type: array
+                              items:
+                                type: number
+                          constrained:
+                            type: number
+                          original name:
+                            type: string
+                          unconstrained:
+                            type: number
+                    attributes:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          attribute type:
+                            type: string
+                          display order:
+                            type: integer
+                test results:
+                  type: object
+                  properties:
+                    LRT:
+                      type: number
+                    p-value:
+                      type: number
+                substitutions:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        root:
+                          type: string
+                      additionalProperties:
+                        type: string
+                Synonymous site-posteriors:
+                  type: array
+                  items:
+                    type: array
+                    items:
+                      type: number
+                Site Log Likelihood:
+                  type: object
+                  properties:
+                    constrained:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    unconstrained:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    optimized null:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                Evidence Ratios:
+                  type: object
+                  properties:
+                    constrained:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    optimized null:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+    AbsrelRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        srv:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'Yes'
+          description: Include synonymous rate variation in the model
+        multiple_hits:
+          type: string
+          enum:
+            - None
+            - Double
+            - Double+Triple
+          default: None
+          description: Specify handling of multiple nucleotide substitutions
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        branches:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Branches to include in the analysis. If empty, all branches are
+            included.
+        blb:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1
+          description: Bag of little bootstrap alignment resampling rate
+    AbsrelResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      AIC-c:
+                        type: number
+                      Log Likelihood:
+                        type: number
+                      Rate Distributions:
+                        type: object
+                      display order:
+                        type: number
+                      estimated parameters:
+                        type: number
+                      Equilibrium frequencies:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                test results:
+                  type: object
+                  properties:
+                    P-value threshold:
+                      type: number
+                    tested:
+                      type: integer
+                    positive test results:
+                      type: integer
+                tested:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: string
+                data partitions:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      coverage:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: integer
+                branch attributes:
+                  type: object
+                  properties:
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          original name:
+                            type: string
+                          Nucleotide GTR:
+                            type: number
+                          Baseline MG94xREV:
+                            type: number
+                          Baseline MG94xREV omega ratio:
+                            type: number
+                          Rate classes:
+                            type: integer
+                          Full adaptive model:
+                            type: number
+                          Rate Distributions:
+                            type: array
+                            items:
+                              type: array
+                              items:
+                                type: number
+                          LRT:
+                            type: number
+                          Uncorrected P-value:
+                            type: number
+                          Corrected P-value:
+                            type: number
+                    attributes:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          attribute type:
+                            type: string
+                          display order:
+                            type: integer
+                timers:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      timer:
+                        type: integer
+                      order:
+                        type: integer
+    MemeRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        multiple_hits:
+          type: string
+          enum:
+            - None
+            - Double
+            - Double+Triple
+          default: None
+          description: Specify handling of multiple nucleotide substitutions
+        site_multihit:
+          type: string
+          enum:
+            - Estimate
+            - Global
+          default: Estimate
+          description: Specify whether to estimate multiple hit rates for each site
+        rates:
+          type: integer
+          default: 2
+          description: Number of different categories of non-synonymous rates
+        resample:
+          type: number
+          default: 0
+          description: Number of bootstrapping replicates
+        impute_states:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'No'
+          description: Option to impute likely character states for missing data
+    MemeResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      AIC-c:
+                        type: number
+                      Equilibrium frequencies:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                      Log Likelihood:
+                        type: number
+                      Rate Distributions:
+                        type: object
+                      display order:
+                        type: number
+                      estimated parameters:
+                        type: number
+                branch attributes:
+                  type: object
+                  properties:
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          Global MG94xREV:
+                            type: number
+                          Nucleotide GTR:
+                            type: number
+                          original name:
+                            type: string
+                    attributes:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        properties:
+                          attribute type:
+                            type: string
+                          display order:
+                            type: integer
+                MLE:
+                  type: object
+                  properties:
+                    headers:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+    RelaxRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        test_branches:
+          type: array
+          description: Branches to be considered as 'Test'
+          default: []
+          items:
+            type: string
+        reference_branches:
+          type: array
+          description: Branches to be considered as 'Reference'
+          default: []
+          items:
+            type: string
+        models:
+          type: string
+          enum:
+            - All
+            - Minimal
+          default: All
+          description: >-
+            Type of analysis to run (All for descriptive models and RELAX test,
+            Minimal for only the RELAX test)
+        rates:
+          type: integer
+          default: 3
+          description: Number of omega rate classes
+        kill_zero_lengths:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          default: 'No'
+          description: Specify whether to handle zero-length branches
+    RelaxResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  properties:
+                    Nucleotide GTR:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Equilibrium frequencies:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                        Rate Distributions:
+                          type: object
+                          additionalProperties:
+                            type: number
+                        display order:
+                          type: integer
+                    MG94xREV with separate rates for branch sets:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Equilibrium frequencies:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                        Rate Distributions:
+                          type: object
+                          additionalProperties:
+                            type: array
+                            items:
+                              type: array
+                              items:
+                                type: number
+                        display order:
+                          type: integer
+                    General descriptive:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                          properties:
+                            Shared:
+                              type: object
+                              additionalProperties:
+                                type: object
+                                properties:
+                                  omega:
+                                    type: number
+                                  proportion:
+                                    type: number
+                        display order:
+                          type: integer
+                    RELAX alternative:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                          properties:
+                            Test:
+                              type: object
+                              additionalProperties:
+                                type: object
+                                properties:
+                                  omega:
+                                    type: number
+                                  proportion:
+                                    type: number
+                            Reference:
+                              type: object
+                              additionalProperties:
+                                type: object
+                                properties:
+                                  omega:
+                                    type: number
+                                  proportion:
+                                    type: number
+                        display order:
+                          type: integer
+                    RELAX null:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                          properties:
+                            Test:
+                              type: object
+                              additionalProperties:
+                                type: object
+                                properties:
+                                  omega:
+                                    type: number
+                                  proportion:
+                                    type: number
+                            Reference:
+                              type: object
+                              additionalProperties:
+                                type: object
+                                properties:
+                                  omega:
+                                    type: number
+                                  proportion:
+                                    type: number
+                        display order:
+                          type: integer
+                test results:
+                  type: object
+                  properties:
+                    p-value:
+                      type: number
+                    relaxation or intensification parameter:
+                      type: number
+                    test:
+                      type: string
+                    alternative:
+                      type: string
+                    'null':
+                      type: string
+                    background:
+                      type: string
+                    log likelihood ratio:
+                      type: number
+                    degrees of freedom:
+                      type: integer
+                    branch attributes:
+                      type: object
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            original name:
+                              type: string
+                            Nucleotide GTR:
+                              type: number
+                            MG94xREV with separate rates for branch sets:
+                              type: number
+                            General descriptive:
+                              type: number
+                            k (general descriptive):
+                              type: number
+                            RELAX null:
+                              type: number
+                            RELAX alternative:
+                              type: number
+                            k (RELAX alternative):
+                              type: number
+                            tested:
+                              type: boolean
+    GardRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        data_type:
+          type: string
+          enum:
+            - Nucleotide
+            - Protein
+          default: Nucleotide
+          description: The type of data being analyzed
+        run_mode:
+          type: string
+          enum:
+            - Normal
+            - Faster
+          default: Normal
+          description: The optimization mode
+        site_to_site_variation:
+          type: string
+          enum:
+            - None
+            - General Discrete
+            - Beta-Gamma
+          default: None
+          description: Specifies the model for rate variation among sites
+        rate_classes:
+          type: integer
+          default: 2
+          description: The number of discrete rate classes for rate variation
+        model:
+          type: string
+          default: JTT
+          description: The substitution model to use
+    GardResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                baselineScore:
+                  type: number
+                  description: Baseline score for the analysis
+                potentialBreakpoints:
+                  type: integer
+                  description: Number of potential breakpoints analyzed
+                singleTreeAICc:
+                  type: number
+                  description: AICc score for the single tree model
+                timeElapsed:
+                  type: integer
+                  description: Time elapsed for the analysis in seconds
+                totalModelCount:
+                  type: integer
+                  description: Total number of models evaluated
+                breakpointData:
+                  type: object
+                  description: Data for each segment between breakpoints
+                  additionalProperties:
+                    type: object
+                    properties:
+                      bps:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: integer
+                        description: Breakpoint positions
+                      tree:
+                        type: string
+                        description: Newick tree for this segment
+                improvements:
+                  type: object
+                  description: Improvement metrics for each breakpoint
+                  additionalProperties:
+                    type: object
+                    properties:
+                      breakpoints:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: integer
+                        description: Breakpoint positions
+                      deltaAICc:
+                        type: number
+                        description: Change in AICc score
+                siteBreakPointSupport:
+                  type: object
+                  description: Support values for potential breakpoints at each site
+                  additionalProperties:
+                    type: number
+                trees:
+                  type: object
+                  description: Tree data
+                  additionalProperties:
+                    type: object
+    BgmRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        branches:
+          type: string
+          default: All
+          description: Specify branches to test
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        data_type:
+          type: string
+          enum:
+            - nucleotide
+            - amino-acid
+            - codon
+          default: codon
+          description: The type of data being analyzed
+        steps:
+          type: integer
+          default: 100000
+          description: Number of MCMC steps to sample
+        burn_in:
+          type: integer
+          default: 10000
+          description: Number of MCMC steps to discard as burn-in
+        samples:
+          type: integer
+          default: 100
+          description: Number of samples to extract from the chain
+        max_parents:
+          type: integer
+          default: 1
+          description: Maximum number of parents allowed per node
+        min_subs:
+          type: integer
+          default: 1
+          description: Minimum number of substitutions per site to include in the analysis
+    BgmResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  description: Model fit information
+                  additionalProperties:
+                    type: object
+                    properties:
+                      Log Likelihood:
+                        type: number
+                      estimated parameters:
+                        type: integer
+                      AIC-c:
+                        type: number
+                      Rate Distributions:
+                        type: object
+                        nullable: true
+                      display order:
+                        type: integer
+                MLE:
+                  type: object
+                  description: Maximum likelihood estimates
+                  properties:
+                    headers:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                      description: Column headers for the content array
+                    content:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                      description: Site pair data with correlation values
+                branch attributes:
+                  type: object
+                  description: Branch-specific attributes
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      additionalProperties:
+                        type: number
+    ContrastFelRequest:
+      type: object
+      required:
+        - alignment
+        - tree
+        - branch_sets
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+        branch_sets:
+          type: array
+          description: >-
+            Array of branch sets to be used for comparison (e.g., "Source" and
+            "Test" groups)
+          items:
+            type: string
+        genetic_code:
+          type: string
+          description: Which genetic code should be used
+          default: Universal
+        srv:
+          type: string
+          description: Include synonymous rate variation in the model ("Yes" or "No")
+          default: 'Yes'
+        permutations:
+          type: string
+          description: Perform permutation significance tests ("Yes" or "No")
+          default: 'Yes'
+        p_value:
+          type: number
+          description: Significance value for site tests
+          default: 0.05
+        q_value:
+          type: number
+          description: Significance value for False Discovery Rate reporting
+          default: 0.2
+    ContrastFelResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                tested:
+                  type: object
+                  description: >-
+                    Mapping of branch names to their test groups (e.g.,
+                    "TREATED", "NAIVE", "background")
+                  additionalProperties:
+                    type: string
+                MLE:
+                  type: object
+                  properties:
+                    headers:
+                      type: array
+                      description: Headers describing the columns in the content array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      description: Site-specific results with statistical values
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: array
+                          description: Array of values for each site
+                          items:
+                            type: number
+                branch_attributes:
+                  type: object
+                  description: Attributes for each branch in the phylogenetic tree
+                  additionalProperties:
+                    type: object
+                fits:
+                  type: object
+                  description: Model fit statistics
+                  additionalProperties:
+                    type: object
+    FubarRequest:
+      type: object
+      required:
+        - alignment
+        - tree
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+        genetic_code:
+          type: string
+          description: Which genetic code should be used
+          default: Universal
+        grid_points:
+          type: integer
+          description: >-
+            Number of grid points for the Bayesian analysis (must be between 5
+            and 50)
+          default: 20
+          minimum: 5
+          maximum: 50
+        concentration_parameter:
+          type: number
+          description: >-
+            Concentration parameter for the Dirichlet prior in the Bayesian
+            estimation
+          default: 0.5
+          minimum: 0.001
+          maximum: 1
+    FubarResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  description: Model fit statistics
+                  additionalProperties:
+                    type: object
+                MLE:
+                  type: object
+                  properties:
+                    headers:
+                      type: array
+                      description: Headers describing the columns in the content array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      description: Site-specific results with statistical values
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: array
+                          description: Array of values for each site
+                          items:
+                            type: number
+                grid:
+                  type: array
+                  description: Grid points for the Bayesian analysis
+                  items:
+                    type: array
+                    description: 'Grid point coordinates and values [alpha, beta, weight]'
+                    items:
+                      type: number
+    MultihitRequest:
+      type: object
+      description: Request parameters for MULTI-HIT analysis
+      required:
+        - alignment
+        - genetic_code
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+        genetic_code:
+          type: string
+          description: The genetic code to use for the analysis
+          default: Universal
+        triple_islands:
+          type: string
+          enum:
+            - 'Yes'
+            - 'No'
+          description: Toggle for accounting synonymous triple-hit substitutions
+          default: 'No'
+        rate_classes:
+          type: integer
+          description: Number of rate classes to use
+          minimum: 1
+          maximum: 10
+          default: 3
+    MultihitResult:
+      type: object
+      description: Results from a MULTI-HIT analysis
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                Evidence Ratios:
+                  type: object
+                  description: Evidence ratios for different substitution types
+                  properties:
+                    Three-hit:
+                      type: array
+                      description: Evidence ratios for three-hit substitutions
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    Two-hit:
+                      type: array
+                      description: Evidence ratios for two-hit substitutions
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    Three-hit islands vs 2-hit:
+                      type: array
+                      description: >-
+                        Evidence ratios comparing three-hit islands vs two-hit
+                        substitutions
+                      items:
+                        type: array
+                        items:
+                          type: number
+                site_substitutions:
+                  type: object
+                  description: Detailed site substitution mappings
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: object
+                fits:
+                  type: object
+                  description: Model fitting information
+                  properties:
+                    MG94 with double and triple instantaneous substitutions:
+                      type: object
+                      properties:
+                        AIC-c:
+                          type: number
+                        Log Likelihood:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                        display order:
+                          type: integer
+                        estimated parameters:
+                          type: integer
+                    MG94 with double and triple instantaneous substitutions only synonymous islands:
+                      type: object
+                      properties:
+                        AIC-c:
+                          type: number
+                        Log Likelihood:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                        display order:
+                          type: integer
+                        estimated parameters:
+                          type: integer
+                    MG94 with double instantaneous substitutions:
+                      type: object
+                      properties:
+                        AIC-c:
+                          type: number
+                        Log Likelihood:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                        display order:
+                          type: integer
+                        estimated parameters:
+                          type: integer
+                    Nucleotide GTR:
+                      type: object
+                      properties:
+                        AIC-c:
+                          type: number
+                        Log Likelihood:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                        display order:
+                          type: integer
+                        estimated parameters:
+                          type: integer
+                    Standard MG94:
+                      type: object
+                      properties:
+                        AIC-c:
+                          type: number
+                        Log Likelihood:
+                          type: number
+                        Rate Distributions:
+                          type: object
+                        display order:
+                          type: integer
+                        estimated parameters:
+                          type: integer
+                test_results:
+                  type: object
+                  description: Statistical test results comparing different models
+                  properties:
+                    Double hit vs single hit:
+                      type: object
+                      properties:
+                        LRT:
+                          type: number
+                        p-value:
+                          type: number
+                    Triple hit vs Triple hit island:
+                      type: object
+                      properties:
+                        LRT:
+                          type: number
+                        p-value:
+                          type: number
+                    Triple hit vs double hit:
+                      type: object
+                      properties:
+                        LRT:
+                          type: number
+                        p-value:
+                          type: number
+                    Triple hit vs single hit:
+                      type: object
+                      properties:
+                        LRT:
+                          type: number
+                        p-value:
+                          type: number
+                    Triple hit island vs double hit:
+                      type: object
+                      properties:
+                        LRT:
+                          type: number
+                        p-value:
+                          type: number
+    SlacRequest:
+      type: object
+      description: >-
+        Request parameters for SLAC (Single Likelihood Ancestor Counting)
+        analysis
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the tree file
+          required: true
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        branches:
+          type: array
+          items:
+            type: string
+          default: []
+          description: >-
+            Branches to include in the analysis. If empty, all branches are
+            included.
+        samples:
+          type: integer
+          description: Number of samples for ancestral reconstruction uncertainty
+          default: 100
+          minimum: 1
+        pvalue:
+          type: number
+          description: Threshold for statistical significance
+          default: 0.1
+          minimum: 0
+          maximum: 1
+    SlacResult:
+      type: object
+      description: Results from a SLAC (Single Likelihood Ancestor Counting) analysis
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  description: Model fitting information
+                  properties:
+                    Nucleotide GTR:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Equilibrium frequencies:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                        Rate Distributions:
+                          type: object
+                          additionalProperties:
+                            type: number
+                        display order:
+                          type: integer
+                    Global MG94xREV:
+                      type: object
+                      properties:
+                        Log Likelihood:
+                          type: number
+                        estimated parameters:
+                          type: integer
+                        AIC-c:
+                          type: number
+                        Equilibrium frequencies:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                        Rate Distributions:
+                          type: object
+                          properties:
+                            distribution:
+                              type: array
+                              items:
+                                type: array
+                                items:
+                                  type: number
+                        display order:
+                          type: integer
+                branch_attributes:
+                  type: object
+                  description: Branch-specific attributes
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        original_name:
+                          type: string
+                        Nucleotide GTR:
+                          type: number
+                        Global MG94xREV:
+                          type: number
+                        codon:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: string
+                        amino_acid:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: string
+                        synonymous_substitution_count:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                        nonsynonymous_substitution_count:
+                          type: array
+                          items:
+                            type: array
+                            items:
+                              type: number
+                MLE:
+                  type: object
+                  description: Maximum likelihood estimates for site-specific results
+                  properties:
+                    headers:
+                      type: array
+                      description: Headers describing the columns in the content array
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      description: Site-specific results with statistical values
+                      additionalProperties:
+                        type: array
+                        items:
+                          type: array
+                          description: >-
+                            Array of values for each site including ES, EN, S,
+                            N, etc.
+                          items:
+                            type: number
+                site_results:
+                  type: object
+                  description: Site-specific results
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: number
+                    description: >-
+                      Array of site-specific statistics including dN, dS,
+                      p-values, etc.
+    NrmRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the nucleotide sequence alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the rooted phylogenetic tree file
+          required: true
+        genetic_code:
+          $ref: '#/components/schemas/GeneticCode'
+          default: Universal
+        save_fit:
+          type: boolean
+          default: false
+          description: Save NRM+F model fit to a file
+    NrmResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      AIC-c:
+                        type: number
+                      Log Likelihood:
+                        type: number
+                      Rate Distributions:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                      display order:
+                        type: number
+                      estimated parameters:
+                        type: number
+                      Equilibrium frequencies:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                branch attributes:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        GTR:
+                          type: number
+                        NREV6:
+                          type: number
+                        NREV12:
+                          type: number
+                        NREV12+F:
+                          type: number
+                        observed frequencies:
+                          type: array
+                          items:
+                            type: number
+                        original name:
+                          type: string
+                test results:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      LRT:
+                        type: number
+                      p-value:
+                        type: number
+                      Corrected P-value:
+                        type: number
+                tested:
+                  type: boolean
+                characters:
+                  type: array
+                  items:
+                    type: array
+                    items:
+                      type: string
+    FadeRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        alignment:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the protein sequence alignment
+          required: true
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the rooted phylogenetic tree file
+          required: true
+        bayes_factor_threshold:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+          description: >-
+            Bayes Factor threshold for determining significant sites (default
+            100)
+    FadeResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                fits:
+                  type: object
+                  description: Model fit information
+                  additionalProperties:
+                    type: object
+                    properties:
+                      Log Likelihood:
+                        type: number
+                        description: Log likelihood of the model fit
+                      estimated parameters:
+                        type: integer
+                        description: Number of estimated parameters
+                      AIC-c:
+                        type: number
+                        description: AIC-c score for the model
+                      Equilibrium frequencies:
+                        type: array
+                        description: Equilibrium frequencies for the model
+                        items:
+                          type: array
+                          items:
+                            type: number
+                      Rate Distributions:
+                        type: object
+                        nullable: true
+                      display order:
+                        type: integer
+                        description: Display order for the model
+                MLE:
+                  type: object
+                  description: Maximum likelihood estimates
+                  properties:
+                    headers:
+                      type: array
+                      description: Column headers for the MLE data
+                      items:
+                        type: array
+                        items:
+                          type: string
+                    content:
+                      type: object
+                      description: MLE content organized by amino acid and partition
+                      additionalProperties:
+                        type: object
+                        additionalProperties:
+                          type: array
+                          description: Site-specific data arrays
+                          items:
+                            type: array
+                            description: '[rate, bias, Prob[bias>0], BayesFactor[bias>0]]'
+                            items:
+                              type: number
+                site annotations:
+                  type: object
+                  description: Annotations for each site
+                  properties:
+                    headers:
+                      type: object
+                      description: Headers for the site annotations
+                      properties:
+                        Composition:
+                          type: string
+                          description: Description of amino acid composition
+                        Substitutions:
+                          type: string
+                          description: Description of substitution history
+                    site annotations:
+                      type: object
+                      description: Site annotations by partition
+                      additionalProperties:
+                        type: array
+                        description: Site-specific annotations
+                        items:
+                          type: array
+                          description: '[composition, substitutions]'
+                          items:
+                            type: string
+    SlatkinRequest:
+      type: object
+      properties:
+        user_token:
+          type: string
+          description: Token identifying the user who is starting the job
+        tree:
+          $ref: '#/components/schemas/Hash'
+          description: Dataset ID of the phylogenetic tree file
+          required: true
+        groups:
+          type: integer
+          minimum: 2
+          maximum: 100
+          default: 2
+          description: The number of compartments/groups to test
+        compartment_definitions:
+          type: array
+          description: Array of compartment definitions
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+                description: Description for sequences in this compartment
+              regexp:
+                type: string
+                description: Regular expression to select the branches in this compartment
+            required:
+              - description
+              - regexp
+        replicates:
+          type: integer
+          minimum: 1
+          maximum: 1000000
+          default: 1000
+          description: The number of bootstrap replicates
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.2
+          description: >-
+            Probability of branch selection for structured permutation [0-1]; 0
+            = classical Slatkin-Maddison, 1 = fully structured
+        use_bootstrap:
+          type: boolean
+          default: true
+          description: Whether to use bootstrap weights to respect well-supported clades
+    SlatkinResult:
+      type: object
+      properties:
+        job_id:
+          $ref: '#/components/schemas/Hash'
+        result:
+          allOf:
+            - $ref: '#/components/schemas/BaseResponse'
+            - type: object
+              properties:
+                compartments:
+                  type: integer
+                  description: Number of compartments in the analysis
+                events:
+                  type: object
+                  description: Migration events between compartments
+                  additionalProperties:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        description: Source compartment
+                      to:
+                        type: string
+                        description: Destination compartment
+                leaf-count:
+                  type: integer
+                  description: Number of leaves in the tree
+                migrations:
+                  type: integer
+                  description: Number of migration events
+                p-value:
+                  type: object
+                  description: P-values for compartmentalization tests
+                  properties:
+                    panmictic:
+                      type: number
+                      description: P-value for full panmixia test
+                    structured:
+                      type: number
+                      description: P-value for structured test
+                partition-counts:
+                  type: object
+                  description: Number of sequences in each partition/compartment
+                  additionalProperties:
+                    type: integer
+                partitions:
+                  type: object
+                  description: Sequences in each partition/compartment
+                  additionalProperties:
+                    type: object
+                    additionalProperties:
+                      type: string
+                replicates:
+                  type: integer
+                  description: Number of bootstrap replicates used
+                node-migrations:
+                  type: object
+                  description: Number of migrations at each node
+                  additionalProperties:
+                    type: integer
+                structured-cutoff:
+                  type: integer
+                  description: Cutoff value for structured test
+                node-p-value:
+                  type: object
+                  description: P-values for each node
+                  properties:
+                    panmictic:
+                      type: object
+                      additionalProperties:
+                        type: number
+                    structured:
+                      type: object
+                      additionalProperties:
+                        type: number
+                simulations:
+                  type: object
+                  description: Simulation results
+                  properties:
+                    panmictic:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+                    structured:
+                      type: array
+                      items:
+                        type: array
+                        items:
+                          type: number
+  headers:
+    XSessionToken:
+      description: >-
+        JWT token for the session (returned when a new session is created
+        automatically)
+      schema:
+        type: string
+        example: >-
+          eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTc2NDQ4MDAsImlhdCI6MTY5NzU1ODQwMCwic3ViIjoiNTUwZTg0MDAtZTI5Yi00MWQ0LWE3MTYtNDQ2NjU1NDQwMDAwIiwidHlwZSI6InVzZXIifQ.signature
