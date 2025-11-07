@@ -224,7 +224,10 @@ class DatamonkeyClient:
                 user_token=token,
                 _headers=headers
             )
-            logger.debug(f"Retrieved {len(result.datasets) if hasattr(result, 'datasets') else 0} datasets")
+            dataset_count = len(result.datasets) if hasattr(result, 'datasets') and result.datasets else 0
+            logger.info(f"Retrieved {dataset_count} datasets")
+            if dataset_count == 0:
+                logger.warning("No datasets found for this user token")
             return result
         except Exception as e:
             logger.error(f"Failed to fetch datasets: {e}")
@@ -323,9 +326,14 @@ class DatamonkeyClient:
         
         try:
             result = await self.visualizations.get_visualizations_list(
-                _headers=headers, **params
+                user_token=token,
+                _headers=headers,
+                **params,
             )
-            logger.debug(f"Retrieved {len(result.visualizations) if hasattr(result, 'visualizations') else 0} visualizations")
+            viz_count = len(result.visualizations) if hasattr(result, 'visualizations') and result.visualizations else 0
+            logger.info(f"Retrieved {viz_count} visualizations")
+            if viz_count == 0:
+                logger.warning("No visualizations found for this user token")
             return result
         except Exception as e:
             logger.error(f"Failed to fetch visualizations: {e}")
@@ -352,4 +360,24 @@ class DatamonkeyClient:
             return result
         except Exception as e:
             logger.error(f"Failed to create visualization: {e}")
+            raise
+
+    async def delete_visualization(self, viz_id: str) -> None:
+        """Delete a visualization owned by the authenticated user."""
+        logger.info(f"Deleting visualization: {viz_id}")
+        token = session_manager.get_token()
+        if not token:
+            raise ValueError("Authentication required. Please create a visualization first.")
+
+        headers = {"user_token": token}
+
+        try:
+            await self.visualizations.delete_visualization(
+                viz_id=viz_id,
+                user_token=token,
+                _headers=headers,
+            )
+            logger.info("Visualization deleted successfully")
+        except Exception as e:
+            logger.error(f"Failed to delete visualization: {e}")
             raise

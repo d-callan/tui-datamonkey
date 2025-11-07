@@ -1,16 +1,17 @@
 """Visualization browser screen."""
 
-import json
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, ScrollableContainer
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Header, Footer, Static, Button, DataTable, LoadingIndicator, TextArea
+from textual.widgets import Header, Footer, Static, Button, DataTable, LoadingIndicator
 from textual.binding import Binding
 from textual import events
 
 from ..api.client import DatamonkeyClient
-from ..config.session import session_manager
 from ..utils.vega_editor import generate_vega_editor_url, open_in_vega_editor
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class VisualizationScreen(Screen):
@@ -28,72 +29,57 @@ class VisualizationScreen(Screen):
     
     CSS = """
     VisualizationScreen {
-        layout: grid;
-        grid-size: 1 2;
-        grid-columns: 1fr 1fr;
-        grid-rows: auto 1fr auto;
+        layout: vertical;
+        height: 100%;
     }
-    
+
     .header {
-        column-span: 2;
+        padding: 0 1;
     }
-    
-    .list-container {
+
+    .toolbar {
+        margin: 0 1;
+        padding: 1 0;
+        layout: horizontal;
+    }
+
+    .toolbar Button {
+        min-width: 14;
+        margin-right: 1;
+    }
+
+    .table-container {
+        margin: 0 1 1 1;
         border: solid $primary;
-        margin: 1;
         padding: 1;
+        expand: greedy;
+        layout: vertical;
     }
-    
-    .detail-container {
+
+    DataTable.viz-table {
+        width: 100%;
+        border: solid $primary;
+        expand: greedy;
+    }
+
+    .info-panel {
         border: solid $secondary;
-        margin: 1;
         padding: 1;
+        layout: vertical;
     }
-    
-    .title {
+
+    .info-title {
         text-style: bold;
         color: $primary;
-        margin: 0 0 1 0;
     }
-    
-    .actions {
-        margin: 1 0;
+
+    .info-content {
+        height: auto;
     }
-    
-    .action-button {
-        margin: 0 1;
-        background: $primary;
-    }
-    
-    .spec-display {
-        height: 100%;
-        background: $surface;
-        border: solid $panel;
-        padding: 1;
-    }
-    
-    .status {
-        text-align: center;
-        color: $text-muted;
-        margin: 1 0;
-        column-span: 2;
-    }
-    
-    DataTable {
-        height: 20;
-    }
-    
+
     .loading {
         height: 3;
         align: center middle;
-    }
-    
-    .url-display {
-        background: $surface;
-        border: solid $primary;
-        padding: 1;
-        margin: 1 0;
-        height: 3;
     }
     """
     
@@ -107,36 +93,26 @@ class VisualizationScreen(Screen):
         self.api_client = api_client
         self.visualizations = []
         self.current_viz = None
+        self._viz_lookup = {}
     
     def compose(self) -> ComposeResult:
         """Create the visualization screen layout."""
         yield Header(classes="header")
-        
-        # Visualization list
-        with Vertical(classes="list-container"):
-            yield Static("📊 Visualizations", classes="title")
-            
-            with Horizontal(classes="actions"):
-                yield Button("🔄 Refresh", id="refresh-btn", classes="action-button")
-                yield Button("🔍 Filter", id="filter-btn", classes="action-button")
-            
-            yield DataTable(id="viz-table")
-        
-        # Visualization details
-        with Vertical(classes="detail-container"):
-            yield Static("Visualization Details", classes="title")
-            
-            with Horizontal(classes="actions"):
-                yield Button("📤 Export", id="export-btn", classes="action-button")
-                yield Button("📋 Copy URL", id="copy-btn", classes="action-button")
-                yield Button("🌐 Open Vega", id="vega-btn", classes="action-button")
-            
-            with ScrollableContainer(classes="spec-display"):
-                yield TextArea(id="spec-display", language="json")
-            
-            yield Static("Vega Editor URL:", classes="url-display", id="url-display")
-        
-        yield Static("Select a visualization to view details", classes="status")
+
+        with Horizontal(classes="toolbar"):
+            yield Button("🔄 Refresh", id="refresh-btn")
+            yield Button("🔍 Filter", id="filter-btn")
+            yield Button("🗑️ Delete", id="delete-btn", disabled=True)
+            yield Button("📤 Export", id="export-btn", disabled=True)
+            yield Button("📋 Copy URL", id="copy-btn", disabled=True)
+            yield Button("🌐 Open Vega", id="vega-btn", disabled=True)
+
+        with Vertical(classes="table-container"):
+            yield DataTable(id="viz-table", classes="viz-table")
+            with Vertical(classes="info-panel"):
+                yield Static("Selected Visualization", classes="info-title")
+                yield Static("None selected", id="viz-info", classes="info-content")
+
         yield Footer()
     
     def key_esc(self) -> None:
@@ -145,19 +121,16 @@ class VisualizationScreen(Screen):
     
     async def on_mount(self) -> None:
         """Initialize the screen when mounted."""
-        # Make spec display readonly
-        spec_widget = self.query_one("#spec-display", TextArea)
-        spec_widget.readonly = True
-        
         await self.setup_table()
         await self.load_visualizations()
+
     
     async def setup_table(self) -> None:
         """Set up the data table columns."""
         table = self.query_one("#viz-table", DataTable)
         
-        table.add_column("ID", key="id", width=15)
-        table.add_column("Type", key="type", width=15)
+        table.add_column("ID", key="id", width=20)
+        table.add_column("Title", key="title", width=25)
         table.add_column("Job ID", key="job_id", width=12)
         table.add_column("Dataset", key="dataset", width=12)
         table.add_column("Created", key="created", width=15)
@@ -174,25 +147,52 @@ class VisualizationScreen(Screen):
             response = await self.api_client.list_visualizations(job_id, dataset_id)
             table = self.query_one("#viz-table", DataTable)
             
-            # Clear existing data
-            table.clear()
+            # Clear existing rows only (preserve columns)
+            table.clear(columns=False)
             
+            info_widget = self.query_one("#viz-info", Static)
+            info_widget.update("None selected")
+            self.current_viz = None
+            self._viz_lookup.clear()
+
             if response.visualizations:
                 self.visualizations = response.visualizations
+                self.notify(f"Loading {len(response.visualizations)} visualizations...")
+
+                for idx, viz in enumerate(response.visualizations):
+                    viz_id = getattr(viz, "viz_id", None)
+                    job_id = getattr(viz, "job_id", None)
+                    dataset_id = getattr(viz, "dataset_id", None)
+                    title = getattr(viz, "title", None)
+                    created_value = getattr(viz, "created_at", None)
+
+                    viz_id_display = (viz_id[:20] + "...") if viz_id and len(viz_id) > 20 else (viz_id or "Unknown")
+                    job_display = (job_id[:12] + "...") if job_id and len(job_id) > 12 else (job_id or "")
+                    dataset_display = (dataset_id[:12] + "...") if dataset_id and len(dataset_id) > 12 else (dataset_id or "")
+                    created_str = self.format_date(created_value)
+
+                    try:
+                        row_key = viz_id or str(idx)
+                        table.add_row(
+                            viz_id_display,
+                            title or "Untitled",
+                            job_display,
+                            dataset_display,
+                            created_str,
+                            key=row_key,
+                        )
+                        self._viz_lookup[row_key] = viz
+                        self.notify(f"Added viz row {idx+1}: {title or 'Untitled'}")
+                    except Exception as row_err:
+                        self.notify(f"Failed to add viz row {idx+1}: {row_err}")
                 
-                for viz in response.visualizations:
-                    # Format date
-                    created_str = self.format_date(viz.created_at) if hasattr(viz, 'created_at') else "N/A"
-                    
-                    table.add_row(
-                        viz.id[:12] + "...",
-                        viz.type or "Unknown",
-                        (viz.job_id or "")[:8] + "...",
-                        (viz.dataset_id or "")[:8] + "...",
-                        created_str
-                    )
+                # Force table refresh
+                table.refresh()
+                self.notify(f"✅ Loaded {len(response.visualizations)} visualizations. Table has {table.row_count} rows.")
             else:
-                table.add_row("No visualizations", "", "", "", "")
+                table.add_row("No visualizations", "", "", "", "", key="empty")
+                table.refresh()
+                self.notify("No visualizations found")
                 
             loading.remove()
             
@@ -202,7 +202,7 @@ class VisualizationScreen(Screen):
             if "Authentication required" in str(e):
                 self.notify("🔐 Please create a job or visualization first to get authenticated")
                 table = self.query_one("#viz-table", DataTable)
-                table.clear()
+                table.clear(columns=False)
                 table.add_row("Create your first job to get started", "", "", "", "")
             else:
                 self.notify(f"Failed to load visualizations: {e}")
@@ -223,6 +223,8 @@ class VisualizationScreen(Screen):
             await self.action_refresh()
         elif event.button.id == "filter-btn":
             await self.action_filter()
+        elif event.button.id == "delete-btn":
+            await self.action_delete()
         elif event.button.id == "export-btn":
             await self.action_export()
         elif event.button.id == "copy-btn":
@@ -233,33 +235,41 @@ class VisualizationScreen(Screen):
     async def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle visualization row selection."""
         if event.row_key and event.row_key.value:
-            viz_index = event.row_key.value - 1  # Row keys are 1-based
-            if 0 <= viz_index < len(self.visualizations):
-                await self.view_visualization(self.visualizations[viz_index])
-    
+            key = str(event.row_key.value)
+            if key in self._viz_lookup:
+                await self.view_visualization(self._viz_lookup[key])
+
     async def view_visualization(self, visualization) -> None:
         """Display visualization details."""
         self.current_viz = visualization
-        
-        # Update spec display
-        spec_widget = self.query_one("#spec-display", TextArea)
-        spec_widget.clear()
-        
-        if hasattr(visualization, 'spec') and visualization.spec:
-            # Format JSON nicely
-            spec_json = json.dumps(visualization.spec, indent=2)
-            spec_widget.insert(spec_json)
-        else:
-            spec_widget.insert("No specification available")
-        
-        # Generate and display Vega Editor URL
-        if hasattr(visualization, 'spec') and visualization.spec:
-            url = generate_vega_editor_url(visualization.spec)
-            url_widget = self.query_one("#url-display", Static)
-            url_widget.update(f"Vega Editor URL: {url[:80]}...")
-        
-        self.notify(f"Viewing: {visualization.type or 'Unknown'} visualization")
-    
+        info_widget = self.query_one("#viz-info", Static)
+
+        spec = getattr(visualization, 'spec', None)
+        logger.info("Raw visualization spec", extra={
+            "type": type(spec).__name__,
+            "preview": str(spec)[:200],
+        })
+        dataset_id = getattr(visualization, "dataset_id", None) or "N/A"
+        job_id = getattr(visualization, "job_id", None) or "N/A"
+        created = getattr(visualization, "created_at", None)
+        created_str = self.format_date(created)
+
+        details = [
+            f"ID: {getattr(visualization, 'viz_id', 'N/A')}",
+            f"Title: {getattr(visualization, 'title', 'Untitled')}",
+            f"Job: {job_id}",
+            f"Dataset: {dataset_id}",
+            f"Created: {created_str}",
+        ]
+
+        if spec and isinstance(spec, dict):
+            preview_keys = ", ".join(list(spec.keys())[:5]) or "(empty spec)"
+            details.append(f"Spec keys: {preview_keys}")
+        info_widget.update("\n".join(details))
+
+        self.notify(f"Viewing: {getattr(visualization, 'title', 'Unknown')} visualization")
+        self._set_action_buttons_state(enabled=True)
+
     async def action_refresh(self) -> None:
         """Refresh the visualization list."""
         await self.load_visualizations()
@@ -274,12 +284,14 @@ class VisualizationScreen(Screen):
         if not self.current_viz:
             self.notify("Please select a visualization first")
             return
-        
-        if hasattr(self.current_viz, 'spec') and self.current_viz.spec:
+
+        spec = getattr(self.current_viz, 'spec', None)
+        if spec:
             # TODO: Implement file save dialog
             self.notify("Export feature coming soon")
         else:
             self.notify("No specification to export")
+
     
     async def action_copy_url(self) -> None:
         """Copy Vega Editor URL to clipboard."""
@@ -287,10 +299,11 @@ class VisualizationScreen(Screen):
             self.notify("Please select a visualization first")
             return
         
-        if hasattr(self.current_viz, 'spec') and self.current_viz.spec:
+        spec = getattr(self.current_viz, 'spec', None)
+        if spec:
             try:
                 import pyperclip
-                url = generate_vega_editor_url(self.current_viz.spec)
+                url = generate_vega_editor_url(spec)
                 pyperclip.copy(url)
                 self.notify("Vega Editor URL copied to clipboard!")
             except ImportError:
@@ -306,9 +319,10 @@ class VisualizationScreen(Screen):
             self.notify("Please select a visualization first")
             return
         
-        if hasattr(self.current_viz, 'spec') and self.current_viz.spec:
+        spec = getattr(self.current_viz, 'spec', None)
+        if spec:
             try:
-                url = open_in_vega_editor(self.current_viz.spec)
+                url = open_in_vega_editor(spec)
                 self.notify(f"Opened in browser: {url[:50]}...")
             except Exception as e:
                 self.notify(f"Failed to open Vega Editor: {e}")
@@ -323,6 +337,32 @@ class VisualizationScreen(Screen):
             self.notify("Please select a visualization first")
             return
         
-        viz_index = table.cursor_row - 1
-        if 0 <= viz_index < len(self.visualizations):
-            await self.view_visualization(self.visualizations[viz_index])
+        row_key = str(table.cursor_key.value)
+        if row_key in self._viz_lookup:
+            await self.view_visualization(self._viz_lookup[row_key])
+
+    async def action_delete(self) -> None:
+        """Delete selected visualization."""
+        if not self.current_viz:
+            self.notify("Please select a visualization first")
+            return
+
+        viz_id = getattr(self.current_viz, "viz_id", None)
+        if not viz_id:
+            self.notify("Cannot delete visualization without ID")
+            return
+
+        try:
+            await self.api_client.delete_visualization(viz_id)
+            self.notify(f"🗑️ Deleted visualization {viz_id}")
+            await self.load_visualizations()
+        except Exception as err:
+            self.notify(f"Failed to delete visualization: {err}")
+        finally:
+            self._set_action_buttons_state(enabled=False)
+
+    def _set_action_buttons_state(self, *, enabled: bool) -> None:
+        """Enable or disable actions that require a selection."""
+        for button_id in ("delete-btn", "export-btn", "copy-btn", "vega-btn"):
+            button = self.query_one(f"#{button_id}", Button)
+            button.disabled = not enabled

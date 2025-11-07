@@ -177,14 +177,14 @@ class DatasetScreen(Screen):
     CSS = """
     DatasetScreen {
         layout: vertical;
+        height: 100%;
     }
-    
+
     .header-container {
-        height: auto;
         padding: 1;
         border-bottom: solid $panel;
     }
-    
+
     .title {
         text-style: bold;
         color: $primary;
@@ -194,31 +194,30 @@ class DatasetScreen(Screen):
         margin: 1 0;
     }
     
-    .table-container {
-        height: 1fr;
-        border: solid $primary;
-        margin: 1;
-    }
-    
-    .status {
-        text-align: center;
-        color: $text-muted;
-        margin: 1 0;
-    }
-    
     .action-button {
         margin: 0 1;
         background: $primary;
     }
-    
-    DataTable {
-        height: 100%;
+
+    .table-container {
+        margin: 0 1 1 1;
+        padding: 1;
+        border: solid $primary;
+        overflow: auto;
+        expand: greedy;
     }
-    
+
+    DataTable.dataset-table {
+        width: 100%;
+        border: solid $primary;
+        expand: greedy;
+    }
+
     .loading {
         height: 3;
         align: center middle;
     }
+
     """
     
     def __init__(self, api_client: DatamonkeyClient):
@@ -242,9 +241,8 @@ class DatasetScreen(Screen):
                 yield Button("🗑️ Delete", id="delete-btn", classes="action-button")
         
         with Vertical(classes="table-container"):
-            yield DataTable(id="dataset-table")
+            yield DataTable(id="dataset-table", classes="dataset-table")
         
-        yield Static("Select a dataset to view details", classes="status")
         yield Footer()
     
     def key_esc(self) -> None:
@@ -279,29 +277,41 @@ class DatasetScreen(Screen):
             response = await self.api_client.list_datasets()
             table = self.query_one("#dataset-table", DataTable)
             
-            # Clear existing data
-            table.clear()
+            # Clear existing rows only (preserve columns)
+            table.clear(columns=False)
             
             if response.datasets:
                 self.datasets = response.datasets
+
+                for idx, dataset in enumerate(response.datasets):
+                    dataset_id = (dataset.id[:16] + "...") if getattr(dataset, "id", None) else "Unknown"
+                    name = getattr(dataset, "name", None) or "Unnamed"
+                    dataset_type = getattr(dataset, "type", None) or "Unknown"
+                    created_value = getattr(dataset, "created", None)
+                    size_str = "N/A"
+                    status_str = "N/A"
+
+                    created_str = self.format_date(created_value)
+
+                    try:
+                        table.add_row(
+                            dataset_id,
+                            name,
+                            dataset_type,
+                            size_str,
+                            created_str,
+                            status_str,
+                        )
+                    except Exception as row_err:
+                        self.notify(f"Failed to add row {idx+1}: {row_err}")
                 
-                for dataset in response.datasets:
-                    # Format size
-                    size_str = self.format_size(dataset.size) if hasattr(dataset, 'size') else "N/A"
-                    
-                    # Format date
-                    created_str = self.format_date(dataset.created_at) if hasattr(dataset, 'created_at') else "N/A"
-                    
-                    table.add_row(
-                        dataset.id[:16] + "...",
-                        dataset.name or "Unnamed",
-                        dataset.type or "Unknown",
-                        size_str,
-                        created_str,
-                        "Ready" if hasattr(dataset, 'status') and dataset.status == "ready" else "Processing"
-                    )
+                # Force table refresh
+                table.refresh()
+                self.notify(f"✅ Loaded {len(response.datasets)} datasets. Table has {table.row_count} rows.")
             else:
                 table.add_row("No datasets", "", "", "", "", "")
+                table.refresh()
+                self.notify("No datasets found")
                 
             loading.remove()
             
@@ -311,7 +321,7 @@ class DatasetScreen(Screen):
             if "Authentication required" in str(e):
                 self.notify("🔐 Please upload a dataset first to get authenticated")
                 table = self.query_one("#dataset-table", DataTable)
-                table.clear()
+                table.clear(columns=False)
                 table.add_row("Upload your first dataset to get started", "", "", "", "", "")
             else:
                 self.notify(escape(f"Failed to load datasets: {e}"))
@@ -319,22 +329,21 @@ class DatasetScreen(Screen):
             loading.remove()
             self.notify(escape(f"Failed to load datasets: {e}"))
     
-    def format_size(self, size_bytes: int) -> str:
-        """Format file size in human readable format."""
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
-    
-    def format_date(self, date_str: str) -> str:
-        """Format date string."""
+    def format_date(self, value) -> str:
+        """Format date value from API."""
+        if value is None:
+            return "N/A"
+
         try:
-            # Simple date formatting - could be enhanced
-            return date_str[:10] if date_str else "N/A"
+            from datetime import datetime
+
+            if isinstance(value, datetime):
+                return value.strftime("%Y-%m-%d")
+
+            value_str = str(value)
+            if len(value_str) >= 10:
+                return value_str[:10]
+            return value_str
         except Exception:
             return "N/A"
     
