@@ -1,6 +1,7 @@
 """Main API client wrapper with session management."""
 
 import logging
+import os
 from typing import Optional
 
 import aiofiles
@@ -29,7 +30,12 @@ except ModuleNotFoundError as import_error:  # pragma: no cover - fallback only
         )
         from openapi_client.models.dataset_meta import DatasetMeta  # type: ignore  # noqa
     else:
-        raise import_error
+        # Provide helpful error message
+        raise ModuleNotFoundError(
+            f"openapi_client module not found. Please run 'make update' to generate the API client, "
+            f"or install it with 'pip install -e ./generated' if the generated/ directory exists. "
+            f"Looked for bundled client at: {candidate}"
+        ) from import_error
 
 from ..config.session import session_manager
 
