@@ -1,13 +1,35 @@
 """Main API client wrapper with session management."""
 
 import logging
-import os
 from typing import Optional
 
 import aiofiles
-from openapi_client import ApiClient, Configuration
-from openapi_client.api import ChatApi, FileUploadAndQCApi, VisualizationsApi
-from openapi_client.models.dataset_meta import DatasetMeta
+
+try:
+    from openapi_client import ApiClient, Configuration
+    from openapi_client.api import ChatApi, FileUploadAndQCApi, VisualizationsApi
+    from openapi_client.models.dataset_meta import DatasetMeta
+except ModuleNotFoundError as import_error:  # pragma: no cover - fallback only
+    import sys
+    from pathlib import Path
+
+    fallback_root = Path(__file__).resolve().parent.parent.parent / "generated"
+    candidate = fallback_root / "openapi_client"
+
+    if candidate.exists():
+        logging.getLogger("datamonkey_tui.api").debug(
+            "Falling back to bundled generated client at %s", candidate
+        )
+        sys.path.insert(0, str(fallback_root))
+        from openapi_client import ApiClient, Configuration  # type: ignore  # noqa
+        from openapi_client.api import (  # type: ignore  # noqa
+            ChatApi,
+            FileUploadAndQCApi,
+            VisualizationsApi,
+        )
+        from openapi_client.models.dataset_meta import DatasetMeta  # type: ignore  # noqa
+    else:
+        raise import_error
 
 from ..config.session import session_manager
 
